@@ -16,9 +16,9 @@ namespace System.Collections.Specialized
     /// </typeparam>
     [Serializable]
     [DebuggerDisplay("Count = {Count.ToString()}")]
+    [DebuggerTypeProxy(typeof(NameValueCollection<>.DebuggerProxy))]
     public class NameValueCollection<T> : NameObjectCollectionBase
     {
-        [DebuggerBrowsable(DebuggerBrowsableState.RootHidden)]
         private string[] _keys;
         private T[] _values;
 
@@ -277,7 +277,6 @@ namespace System.Collections.Specialized
             {
                 arrayList.AddRange(GetValues(i));
             }
-
             arrayList.AsArray<T>();
             return arrayList;
         }
@@ -460,15 +459,14 @@ namespace System.Collections.Specialized
         }
 
         /// <summary>
-        /// Gets collection of <see cref="DictionaryEntry"/> entries that contains
+        /// Gets collection of entries that contains
         /// all keys and values pairs in the <see cref="NameValueCollection{T}" />.
         /// </summary>
         /// <returns>
         /// A collection of <see cref="DictionaryEntry"/> that contains
         /// all the entries of the <see cref="NameValueCollection{T}" />.
         /// </returns>
-        [DebuggerBrowsable(DebuggerBrowsableState.RootHidden)]
-        protected IEnumerable<DictionaryEntry> Entries
+        protected IEnumerable<KeyValuePair<string, T>> Entries
         {
             get
             {
@@ -476,9 +474,20 @@ namespace System.Collections.Specialized
                 {
                     foreach (T value in GetValues(key))
                     {
-                        yield return new DictionaryEntry(key, value);
+                        yield return new KeyValuePair<string, T>(key, value);
                     }
                 }
+            }
+        }
+        
+        private class DebuggerProxy
+        {
+            [DebuggerBrowsable(DebuggerBrowsableState.RootHidden)]
+            public KeyValuePair<string, T>[] Entries { get; }
+
+            public DebuggerProxy(NameValueCollection<T> collection)
+            {
+                Entries = collection.Entries.ToArray();
             }
         }
     }

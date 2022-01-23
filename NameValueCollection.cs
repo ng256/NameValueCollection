@@ -726,7 +726,7 @@ namespace System
                 var a = Assembly.GetAssembly(typeof(object));
                 var n = a.GetName().Name;
                 var m = new ResourceManager(n, a);
-                _mscorlib = m.GetResourceSet(CultureInfo.CurrentUICulture, false, true);
+                _mscorlib = m.GetResourceSet(CultureInfo.CurrentUICulture, true, true);
             }
 
             return _mscorlib.GetString(name);

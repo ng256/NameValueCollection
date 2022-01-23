@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
@@ -7,6 +8,7 @@ using static System.Extensions;
 
 namespace System.Collections.Specialized
 {
+
     /// <summary>
     /// Represents a generic collection of associated <see cref="string" /> keys
     /// and <typeparamref name="T"/> values that can be accessed either with the key or with the index.
@@ -16,11 +18,13 @@ namespace System.Collections.Specialized
     /// </typeparam>
     [Serializable]
     [DebuggerDisplay("Count = {Count.ToString()}")]
-    [DebuggerTypeProxy(typeof(NameValueCollection<>.DebuggerProxy))]
-    public class NameValueCollection<T> : NameObjectCollectionBase
+    [DebuggerTypeProxy(typeof(NameValueCollection<>.Enumerator))]
+    public class NameValueCollection<T> : NameObjectCollectionBase, IDictionary, IEnumerable<KeyValuePair<string, T>>
     {
-        private string[] _keys;
         private T[] _values;
+        private string[] _keys;
+
+        #region Constructor
 
         /// <summary>
         /// Initializes a new instance of the <see cref="NameValueCollection{T}" /> class that is empty,
@@ -42,9 +46,9 @@ namespace System.Collections.Specialized
         /// <param name="comparer">
         /// The <see cref="IComparer" /> to use to determine whether two keys are equal.
         /// </param>
-        [Obsolete("Please use NameValueCollection(IEqualityComparer) instead.")]
+        [Obsolete("Please use NameValueCollection<T>(IEqualityComparer) instead.")]
         public NameValueCollection(IHashCodeProvider hashProvider, IComparer comparer)
-          : base(hashProvider, comparer)
+            : base(hashProvider, comparer)
         {
         }
 
@@ -60,7 +64,7 @@ namespace System.Collections.Specialized
         /// <paramref name="capacity" /> is less than zero.
         /// </exception>
         public NameValueCollection(int capacity)
-          : base(capacity)
+            : base(capacity)
         {
         }
 
@@ -72,7 +76,7 @@ namespace System.Collections.Specialized
         /// to determine whether two keys are equal and to generate hash codes for the keys in the collection.
         /// </param>
         public NameValueCollection(IEqualityComparer equalityComparer)
-          : base(equalityComparer)
+            : base(equalityComparer)
         {
         }
 
@@ -91,7 +95,7 @@ namespace System.Collections.Specialized
         /// <paramref name="capacity" /> is less than zero.
         /// </exception>
         public NameValueCollection(int capacity, IEqualityComparer equalityComparer)
-          : base(capacity, equalityComparer)
+            : base(capacity, equalityComparer)
         {
         }
 
@@ -104,7 +108,7 @@ namespace System.Collections.Specialized
         /// The initial number of entries that the <see cref="NameValueCollection{T}" /> can contain.
         /// </param>
         /// <param name="col">
-        /// The <see cref="NameValueCollection{T}" /> to copy to the new <see cref="NameValueCollection{T}" /> instance.
+        /// The <see cref="NameValueCollection{T}" /> to copy to the new <see cref="NameValueCollection{T}"/>.
         /// </param>
         /// <exception cref="ArgumentOutOfRangeException">
         /// <paramref name="capacity" /> is less than zero.
@@ -113,7 +117,7 @@ namespace System.Collections.Specialized
         /// <paramref name="col" /> is <see langword="null" />.
         /// </exception>
         public NameValueCollection(int capacity, NameValueCollection<T> col)
-          : base(capacity)
+            : base(capacity)
         {
             if (col == null)
                 throw new ArgumentNullException(nameof(col));
@@ -138,7 +142,7 @@ namespace System.Collections.Specialized
         /// <paramref name="capacity" /> is less than zero.</exception>
         [Obsolete("Please use NameValueCollection<T>(Int32, IEqualityComparer) instead.")]
         public NameValueCollection(int capacity, IHashCodeProvider hashProvider, IComparer comparer)
-          : base(capacity, hashProvider, comparer)
+            : base(capacity, hashProvider, comparer)
         {
         }
 
@@ -148,23 +152,89 @@ namespace System.Collections.Specialized
         /// </summary>
         /// <param name="info">
         /// A <see cref="SerializationInfo" /> object that contains the information
-        /// required to serialize the new <see cref="NameValueCollection{T}" /> instance.
+        /// required to serialize the new <see cref="NameValueCollection{T}"/>.
         /// </param>
         /// <param name="context">A <see cref="StreamingContext" /> object that contains the source
-        /// and destination of the serialized stream associated with the new <see cref="NameValueCollection{T}" /> instance.
+        /// and destination of the serialized stream associated with the new <see cref="NameValueCollection{T}"/>.
         /// </param>
         protected NameValueCollection(SerializationInfo info, StreamingContext context)
-          : base(info, context)
+            : base(info, context)
         {
         }
+
+        #endregion
+
+        #region Methods
 
         /// <summary>
         /// Resets the cached arrays of the collection to <see langword="null" />.
         /// </summary>
         protected void InvalidateCachedArrays()
         {
-            _values = (T[])null;
-            _keys = (string[])null;
+            _values = null;
+            _keys = null;
+        }
+
+        /// <summary>
+        /// Returns an array that contains all the values in the <see cref="NameValueCollection{T}"/>.
+        /// </summary>
+        /// <returns>
+        /// An array that contains all the values in the <see cref="NameValueCollection{T}"/>.
+        /// </returns>
+        protected ArrayList GetAllValues()
+        {
+            int count = Count;
+            ArrayList arrayList = new ArrayList(count);
+            for (int i = 0; i < count; ++i)
+            {
+                arrayList.AddRange(Get(i));
+            }
+            arrayList.AsArray<T>();
+            return arrayList;
+        }
+
+        /// <summary>
+        /// Gets collection of <see cref="DictionaryEntry"/> entries that contains
+        /// all keys and values pairs in the <see cref="NameValueCollection{T}" />.
+        /// </summary>
+        /// <returns>
+        /// A collection of <see cref="DictionaryEntry"/> that contains
+        /// all the entries in the <see cref="NameValueCollection{T}"/>.
+        /// </returns>
+        protected IEnumerable<KeyValuePair<string, T>> GetAllEntries()
+        {
+            foreach (string key in Keys)
+            {
+                foreach (T value in Get(key))
+                {
+                    yield return new KeyValuePair<string, T>(key, value);
+                }
+            }
+        }
+
+        /// <summary>Adds an entry with the specified name and value to the <see cref="NameValueCollection{T}" />.</summary>
+        /// <param name="name">The <see cref="string" /> key of the entry to add. The key can be <see langword="null" />.</param>
+        /// <param name="value">The value of the entry to add. The value can be <see langword="null" />.</param>
+        /// <exception cref="NotSupportedException">The collection is read-only. </exception>
+        public virtual void Add(string name, T value)
+        {
+            if (IsReadOnly)
+                throw new NotSupportedException(GetResourceString("CollectionReadOnly"));
+            InvalidateCachedArrays();
+            ArrayList arrayList = (ArrayList)BaseGet(name);
+            if (arrayList == null)
+            {
+                arrayList = new ArrayList(1);
+                if (value != null)
+                    arrayList.Add(value);
+                BaseAdd(name, arrayList);
+            }
+            else
+            {
+                if (value == null)
+                    return;
+                arrayList.Add(value);
+            }
         }
 
         /// <summary>
@@ -181,24 +251,102 @@ namespace System.Collections.Specialized
         /// <exception cref="T:System.ArgumentNullException">
         /// <paramref name="collection" /> is <see langword="null" />.
         /// </exception>
-        public void Add(NameValueCollection<T> collection)
+        public virtual void Add(NameValueCollection<T> collection)
         {
             if (collection == null)
                 throw new ArgumentNullException(nameof(collection));
             InvalidateCachedArrays();
             int count = collection.Count;
-            for (int index1 = 0; index1 < count; ++index1)
+            for (int i = 0; i < count; i++)
             {
-                string key = collection.GetKey(index1);
-                T[] values = collection.GetValues(index1);
+                string key = collection.GetKey(i);
+                T[] values = collection.Get(i);
                 if (values != null)
                 {
-                    for (int index2 = 0; index2 < values.Length; ++index2)
-                        Add(key, values[index2]);
+                    foreach (var value in values)
+                        Add(key, value);
                 }
                 else
-                    Add(key,default);
+                    Add(key, default);
             }
+        }
+
+        /// <summary>
+        /// Gets the values associated with the specified key
+        /// from the <see cref="NameValueCollection{T}" />.
+        /// </summary>
+        /// <param name="name">
+        /// The <see cref="string"/> key of the entry that contains the values to get.
+        /// The key can be <see langword="null" />.
+        /// </param>
+        /// <returns>
+        /// An array that contains the values associated
+        /// with the specified key from the <see cref="NameValueCollection{T}" />,
+        /// if found; otherwise, <see langword="null" />.
+        /// </returns>
+        public virtual T[] Get(string name)
+        {
+            return ((ArrayList)BaseGet(name)).AsArray<T>();
+        }
+
+        /// <summary>
+        /// Gets the values at the specified index of the <see cref="NameValueCollection{T}" />.
+        /// </summary>
+        /// <param name="index">
+        /// The zero-based index of the entry that contains the values to get from the collection.
+        /// </param>
+        /// <returns>
+        /// An array that contains the values at the specified index of the <see cref="NameValueCollection{T}" />,
+        /// if found; otherwise, <see langword="null" />.
+        /// </returns>
+        /// <exception cref="ArgumentOutOfRangeException">
+        /// <paramref name="index" /> is outside the valid range of indexes for the collection.
+        /// </exception>
+        public virtual T[] Get(int index)
+        {
+            return ((ArrayList)BaseGet(index)).AsArray<T>();
+        }
+
+        /// <summary>Sets the value of an entry in the <see cref="NameValueCollection{T}" />.
+        /// </summary>
+        /// <param name="name">
+        /// The <see cref="string" /> key of the entry to add the new value to.
+        /// The key can be <see langword="null" />.
+        /// </param>
+        /// <param name="value">
+        /// The new value to add to the specified entry.
+        /// The value can be <see langword="null" />.
+        /// </param>
+        /// <exception cref="NotSupportedException">
+        /// The collection is read-only.
+        /// </exception>
+        public virtual void Set(string name, T value)
+        {
+            if (IsReadOnly)
+                throw new NotSupportedException(GetResourceString("CollectionReadOnly"));
+            InvalidateCachedArrays();
+            BaseSet(name, new ArrayList(1) {value});
+        }
+
+        /// <summary>Sets the value of an entry in the <see cref="NameValueCollection{T}" />.
+        /// </summary>
+        /// <param name="name">
+        /// The <see cref="string" /> key of the entry to add the new value to.
+        /// The key can be <see langword="null" />.
+        /// </param>
+        /// <param name="values">
+        /// New values to add to the specified entry.
+        /// The value can be <see langword="null" />.
+        /// </param>
+        /// <exception cref="NotSupportedException">
+        /// The collection is read-only.
+        /// </exception>
+        public virtual void Set(string name, params T[] values)
+        {
+            if (IsReadOnly)
+                throw new NotSupportedException(GetResourceString("CollectionReadOnly"));
+            InvalidateCachedArrays();
+            BaseSet(name, new ArrayList(values));
         }
 
         /// <summary>
@@ -242,121 +390,31 @@ namespace System.Collections.Specialized
         /// The type of the source <see cref="NameValueCollection{T}" />
         /// cannot be cast automatically to the type of the destination <paramref name="dest" />.
         /// </exception>
-        public void CopyTo(T[] dest, int index)
+        public virtual void CopyTo(T[] dest, int index)
         {
             if (dest == null)
                 throw new ArgumentNullException(nameof(dest));
             if (dest.Rank != 1)
-                throw new ArgumentException(GetResourceString("Arg_MultiRank"));
+                throw new ArgumentException(
+                    GetResourceString("Arg_MultiRank"));
             if (index < 0)
                 throw new ArgumentOutOfRangeException(nameof(index), 
-                    GetResourceString("IndexOutOfRange", (object)index.ToString((IFormatProvider)CultureInfo.CurrentCulture)));
+                    GetResourceString("IndexOutOfRange", 
+                        (object)index.ToString(CultureInfo.CurrentCulture)));
             if (_values == null)
             {
                 _values = GetAllValues().AsArray<T>();
             }
             int count = _values.Length;
             if (dest.Length - index < count)
-                throw new ArgumentException(GetResourceString("Arg_InsufficientSpace"));
+                throw new ArgumentException(
+                    GetResourceString("Arg_InsufficientSpace"));
             for (int i = 0; i < count; i++)
                 dest.SetValue(_values[i], i + index);
         }
 
         /// <summary>
-        /// Returns an array that contains all the values in the <see cref="NameValueCollection{T}" /> instance.
-        /// </summary>
-        /// <returns>
-        /// An array that contains all the values in the <see cref="NameValueCollection{T}" /> instance.
-        /// </returns>
-        protected ArrayList GetAllValues()
-        {
-            object[] values =  base.BaseGetAllValues();
-            int count = Count;
-            ArrayList arrayList = new ArrayList(count);
-            for (int i = 0; i < count; ++i)
-            {
-                arrayList.AddRange(GetValues(i));
-            }
-            arrayList.AsArray<T>();
-            return arrayList;
-        }
-
-
-        /// <summary>Gets a value indicating whether the <see cref="NameValueCollection{T}" />
-        /// contains keys that are not <see langword="null" />.</summary>
-        /// <returns>
-        /// <see langword="true" /> if the <see cref="NameValueCollection{T}" />
-        /// contains keys that are not <see langword="null" />; otherwise, <see langword="false" />.
-        /// </returns>
-        public bool HasKeys()
-        {
-            return BaseHasKeys();
-        }
-
-        /// <summary>Adds an entry with the specified name and value to the <see cref="NameValueCollection{T}" />.</summary>
-        /// <param name="name">The <see cref="string" /> key of the entry to add. The key can be <see langword="null" />.</param>
-        /// <param name="value">The value of the entry to add. The value can be <see langword="null" />.</param>
-        /// <exception cref="NotSupportedException">The collection is read-only. </exception>
-        public virtual void Add(string name, T value)
-        {
-            if (IsReadOnly)
-                throw new NotSupportedException(GetResourceString("CollectionReadOnly"));
-            InvalidateCachedArrays();
-            ArrayList arrayList1 = (ArrayList)BaseGet(name);
-            if (arrayList1 == null)
-            {
-                ArrayList arrayList2 = new ArrayList(1);
-                if (value != null)
-                    arrayList2.Add((object)value);
-                BaseAdd(name, (object)arrayList2);
-            }
-            else
-            {
-                if (value == null)
-                    return;
-                arrayList1.Add((object)value);
-            }
-        }
-
-        /// <summary>
-        /// Gets the values associated with the specified key from the <see cref="NameValueCollection{T}" />.
-        /// </summary>
-        /// <param name="name">
-        /// The <see cref="string"/> key of the entry that contains the values to get. The key can be <see langword="null" />.
-        /// </param>
-        /// <returns>
-        /// An array that contains the values associated with the specified key from the <see cref="NameValueCollection{T}" />,
-        /// if found; otherwise, <see langword="null" />.
-        /// </returns>
-        public virtual T[] GetValues(string name)
-        {
-            return ((ArrayList) BaseGet(name)).AsArray<T>();
-        }
-
-        /// <summary>Sets the value of an entry in the <see cref="NameValueCollection{T}" />.
-        /// </summary>
-        /// <param name="name">The <see cref="string" /> key of the entry to add the new value to.
-        /// The key can be <see langword="null" />.</param>
-        /// <param name="value">
-        /// The <see cref="object" /> that represents the new value to add to the specified entry.
-        /// The value can be <see langword="null" />.
-        /// </param>
-        /// <exception cref="NotSupportedException">
-        /// The collection is read-only.
-        /// </exception>
-        public virtual void Set(string name, T value)
-        {
-            if (IsReadOnly)
-                throw new NotSupportedException(GetResourceString("CollectionReadOnly"));
-            InvalidateCachedArrays();
-            BaseSet(name, (object) new ArrayList(1)
-            {
-                (object) value
-            });
-        }
-
-        /// <summary>
-        /// Removes the entries with the specified key from the <see cref="NameValueCollection{T}" /> instance.
+        /// Removes the entries with the specified key from the <see cref="NameValueCollection{T}"/>.
         /// </summary>
         /// <param name="name">
         /// The <see cref="string" /> key of the entry to remove. The key can be <see langword="null" />.
@@ -370,22 +428,15 @@ namespace System.Collections.Specialized
             BaseRemove(name);
         }
 
-        /// <summary>
-        /// Gets the values at the specified index of the <see cref="NameValueCollection{T}" />.
-        /// </summary>
-        /// <param name="index">
-        /// The zero-based index of the entry that contains the values to get from the collection.
-        /// </param>
+        /// <summary>Gets a value indicating whether the <see cref="NameValueCollection{T}" />
+        /// contains keys that are not <see langword="null" />.</summary>
         /// <returns>
-        /// An array that contains the values at the specified index of the <see cref="NameValueCollection{T}" />,
-        /// if found; otherwise, <see langword="null" />.
+        /// <see langword="true" /> if the <see cref="NameValueCollection{T}" />
+        /// contains keys that are not <see langword="null" />; otherwise, <see langword="false" />.
         /// </returns>
-        /// <exception cref="ArgumentOutOfRangeException">
-        /// <paramref name="index" /> is outside the valid range of indexes for the collection.
-        /// </exception>
-        public virtual T[] GetValues(int index)
+        public bool HasKeys()
         {
-            return ((ArrayList) BaseGet(index)).AsArray<T>();
+            return BaseHasKeys();
         }
 
         /// <summary>
@@ -406,25 +457,9 @@ namespace System.Collections.Specialized
             return BaseGetKey(index);
         }
 
-        /// <summary>
-        /// Gets the entry at the specified index of the <see cref="NameValueCollection{T}" />.
-        /// </summary>
-        /// <param name="index">
-        /// The zero-based index of the entry to locate in the collection.
-        /// </param>
-        /// <returns>
-        /// A <see cref="string" /> that contains the comma-separated list of values at the specified index of the collection.
-        /// </returns>
-        /// <exception cref="ArgumentOutOfRangeException">
-        /// <paramref name="index" /> is outside the valid range of indexes for the collection.
-        /// </exception>
-        public T[] this[int index]
-        {
-            get
-            {
-                return GetValues(index);
-            }
-        }
+        #endregion
+
+        #region Properties
 
         /// <summary>
         /// Gets all the keys in the <see cref="NameValueCollection{T}" />.
@@ -432,7 +467,7 @@ namespace System.Collections.Specialized
         /// <returns>
         /// A <see cref="string" /> array that contains all the keys of the <see cref="NameValueCollection{T}" />.
         /// </returns>
-        public virtual string[] AllKeys
+        public new string[] Keys
         {
             get
             {
@@ -448,48 +483,233 @@ namespace System.Collections.Specialized
         /// <returns>
         /// An array that contains all the values of the <see cref="NameValueCollection{T}" />.
         /// </returns>
-        public virtual string[] Values
+        public virtual T[] Values
         {
             get
             {
                 if (_values == null)
                     _values = GetAllValues().AsArray<T>();
-                return _keys;
+                return _values;
             }
         }
 
         /// <summary>
-        /// Gets collection of entries that contains
-        /// all keys and values pairs in the <see cref="NameValueCollection{T}" />.
+        /// Gets of sets the values at the specified index of the <see cref="NameValueCollection{T}" />.
         /// </summary>
+        /// <param name="index">
+        /// The zero-based index of the entry to locate in the collection.
+        /// </param>
         /// <returns>
-        /// A collection of <see cref="DictionaryEntry"/> that contains
-        /// all the entries of the <see cref="NameValueCollection{T}" />.
+        /// An array that contains all the values at the specified index of the <see cref="NameValueCollection{T}" />.
         /// </returns>
-        protected IEnumerable<KeyValuePair<string, T>> Entries
+        /// <exception cref="ArgumentOutOfRangeException">
+        /// <paramref name="index" /> is outside the valid range of indexes for the collection.
+        /// </exception>
+        public T[] this[int index]
         {
             get
             {
-                foreach (string key in AllKeys)
+                return Get(index);
+            }
+            set
+            {
+                BaseSet(index, new ArrayList(value));
+            }
+        }
+
+        /// <summary>
+        /// Gets of sets the values at the specified name of the <see cref="NameValueCollection{T}" />.
+        /// </summary>
+        /// <param name="name">
+        /// A <see cref="string" /> that contains the name of the entry to locate in the collection.
+        /// </param>
+        /// <returns>
+        /// An array that contains all the values at the specified name of the <see cref="NameValueCollection{T}" />.
+        /// </returns>
+        /// <exception cref="ArgumentOutOfRangeException">
+        /// <paramref name="name" /> is outside the valid range of names for the collection.
+        /// </exception>
+        public T[] this[string name]
+        {
+            get
+            {
+                return Get(name);
+            }
+            set
+            {
+                BaseSet(name, new ArrayList(value));
+            }
+        }
+
+        #endregion
+
+        #region IDictionary, IEnumerable
+
+        /// <inheritdoc cref="IDictionary.Values"/>
+        ICollection IDictionary.Values => Values;
+
+        /// <inheritdoc cref="IDictionary.IsReadOnly"/>
+        public new bool IsReadOnly => base.IsReadOnly;
+
+        /// <inheritdoc cref="IDictionary.IsFixedSize"/>
+        public bool IsFixedSize => false;
+
+        /// <inheritdoc cref="IDictionary.Keys"/>
+        ICollection IDictionary.Keys => Keys;
+
+        /// <inheritdoc cref="IDictionary.Contains"/>
+        bool IDictionary.Contains(object key)
+        {
+            return key is string s && Keys.Contains(s);
+        }
+
+        /// <inheritdoc cref="IDictionary.Add"/>
+        void IDictionary.Add(object key, object value)
+        {
+            
+            string k = key.CastTo<string>(new ArgumentException(
+                GetResourceString("Argument_InvalidKey"), nameof(key)));
+            T v = value.CastTo<T>(new ArgumentException(
+                GetResourceString("Argument_InvalidValue"), nameof(key)));
+            ((NameValueCollection<T>)this).Add(k, v);
+        }
+
+        /// <inheritdoc cref="IEnumerable{T}.GetEnumerator"/>
+        IEnumerator<KeyValuePair<string, T>> IEnumerable<KeyValuePair<string, T>>.GetEnumerator()
+        {
+            return new Enumerator(this);
+        }
+
+        /// <inheritdoc cref="IEnumerable.GetEnumerator"/>
+        public override IEnumerator GetEnumerator()
+        {
+            return new Enumerator(this);
+        }
+
+        /// <inheritdoc cref="IDictionary.GetEnumerator"/>
+        IDictionaryEnumerator IDictionary.GetEnumerator()
+        {
+            return new Enumerator(this);
+        }
+
+        /// <inheritdoc cref="IDictionary.Remove"/>
+        void IDictionary.Remove(object key)
+        {
+            string k = key.CastTo<string>(new ArgumentException(
+                GetResourceString("Argument_InvalidKey"), nameof(key)));
+            Remove(k);
+        }
+
+        /// <inheritdoc cref="IDictionary.this"/>
+        object IDictionary.this[object key]
+        {
+            get
+            {
+                string k = key.CastTo<string>(new ArgumentException(
+                    GetResourceString("Argument_InvalidKey"), nameof(key)));
+                return Get(k);
+            }
+            set
+            {
+                string k = key.CastTo<string>(new ArgumentException(
+                    GetResourceString("Argument_InvalidKey"), nameof(key)));
+                if (value is IEnumerable<T> collection)
                 {
-                    foreach (T value in GetValues(key))
-                    {
-                        yield return new KeyValuePair<string, T>(key, value);
-                    }
+                    ((NameValueCollection<T>)this).Set(k, collection.AsArray());
+                }
+                else
+                {
+                    T v = value.CastTo<T>(new ArgumentException(
+                        GetResourceString("Argument_InvalidValue"), nameof(key)));
+                    ((NameValueCollection<T>)this).Set(k, v);
                 }
             }
         }
-        
-        private class DebuggerProxy
+
+        #endregion
+
+        #region Enumerator
+
+        private class Enumerator : IEnumerator<KeyValuePair<string, T>>, IDictionaryEnumerator
         {
             [DebuggerBrowsable(DebuggerBrowsableState.RootHidden)]
-            public KeyValuePair<string, T>[] Entries { get; }
+            private IEnumerable<KeyValuePair<string, T>> Entries { get; }
 
-            public DebuggerProxy(NameValueCollection<T> collection)
+            [DebuggerBrowsable(DebuggerBrowsableState.Never)]
+            private readonly IEnumerator<KeyValuePair<string, T>> _enumerator;
+
+            public Enumerator(NameValueCollection<T> collection)
             {
-                Entries = collection.Entries.ToArray();
+                IEnumerable<KeyValuePair<string, T>> entries = collection.GetAllEntries().AsArray();
+                Entries = entries;
+                _enumerator = entries.GetEnumerator();
+            }
+            [DebuggerBrowsable(DebuggerBrowsableState.Never)]
+            KeyValuePair<string, T> IEnumerator<KeyValuePair<string, T>>.Current
+            {
+                get
+                {
+                    return _enumerator.Current;
+                }
+            }
+
+            [DebuggerBrowsable(DebuggerBrowsableState.Never)]
+            object IEnumerator.Current
+            {
+                get
+                {
+                    IEnumerator enumerator = ((IEnumerator) _enumerator);
+                    return enumerator.Current;
+                }
+            }
+
+            [DebuggerBrowsable(DebuggerBrowsableState.Never)]
+            object IDictionaryEnumerator.Key
+            {
+                get
+                {
+                    IEnumerator<KeyValuePair<string, T>> enumerator = ((IEnumerator<KeyValuePair<string, T>>) this);
+                    return enumerator.Current.Key;
+                }
+            }
+
+            [DebuggerBrowsable(DebuggerBrowsableState.Never)]
+            object IDictionaryEnumerator.Value
+            {
+                get
+                {
+                    IEnumerator<KeyValuePair<string, T>> enumerator = ((IEnumerator<KeyValuePair<string, T>>) this);
+                    return enumerator.Current.Value;
+                }
+            }
+
+            [DebuggerBrowsable(DebuggerBrowsableState.Never)]
+            DictionaryEntry IDictionaryEnumerator.Entry
+            {
+                get
+                {
+                    IEnumerator<KeyValuePair<string, T>> enumerator = ((IEnumerator<KeyValuePair<string, T>>) this);
+                    return new DictionaryEntry(enumerator.Current.Key,
+                        enumerator.Current.Value);
+                }
+            }
+
+            public bool MoveNext()
+            {
+                return _enumerator.MoveNext();
+            }
+
+            public void Reset()
+            {
+                _enumerator.Reset();
+            }
+
+            public void Dispose()
+            {
             }
         }
+
+        #endregion
     }
 }
 
@@ -526,5 +746,53 @@ namespace System
             list.CopyTo(0, array, 0, count);
             return array;
         }
+
+        internal static T[] AsArray<T>(this IEnumerable<T> collection)
+        {
+            T[] array = null;
+            int length = 0;
+            if (collection is ICollection<T> elements)
+            {
+                length = elements.Count;
+                if (length > 0)
+                {
+                    array = new T[length];
+                    elements.CopyTo(array, 0);
+                }
+            }
+            else
+            {
+                foreach (T element in collection)
+                {
+                    if (array == null)
+                        array = new T[4];
+                    else if (array.Length == length)
+                    {
+                        T[] tmpArray = new T[checked(length * 2)];
+                        Array.Copy((Array)array, 0, (Array)tmpArray, 0, length);
+                        array = tmpArray;
+                    }
+                    array[length] = element;
+                    ++length;
+                }
+            }
+            return array;
+        }
+    }
+
+    internal static T CastTo<T>(this object obj, Exception e = null)
+    {
+        Type destType = typeof(T);
+        if (obj == null)
+        {
+            if (destType.IsValueType)
+                throw e ?? new InvalidOperationException(GetResourceString("Arg_NullReferenceException"));
+            return default;
+        }
+
+        if (obj is T t)
+            return t;
+
+        throw e ?? new InvalidOperationException(GetResourceString("InvalidCast_FromTo", obj?.GetType().Name ?? "null", typeof(T).Name));
     }
 }

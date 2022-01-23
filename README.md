@@ -9,4 +9,7 @@ NameValueCollection<int> collection = new NameValueCollection<int>();
 collection.Add("a", 123);
 collection.Add("a", 456); // 123 and 456 will be inserted into the same key. 
 collection.Add("b", 789); // 789 will be inserted into another key.
+
+int[] a = collection.Get("a"); // contains 132 and 456.
+int[] b = collection.Get("b"); // contains 789.
 ```

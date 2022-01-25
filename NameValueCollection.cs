@@ -1,8 +1,11 @@
 using System;
+using System.Collections;
 using System.Linq;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
+using System.Reflection;
+using System.Resources;
 using System.Runtime.Serialization;
 using static System.Extensions;
 
@@ -267,7 +270,7 @@ namespace System.Collections.Specialized
                         Add(key, value);
                 }
                 else
-                    Add(key, default);
+                    Add(key, default(T));
             }
         }
 
@@ -778,21 +781,21 @@ namespace System
             }
             return array;
         }
-    }
-
-    internal static T CastTo<T>(this object obj, Exception e = null)
-    {
-        Type destType = typeof(T);
-        if (obj == null)
+        internal static T CastTo<T>(this object obj, Exception e = null)
         {
-            if (destType.IsValueType)
-                throw e ?? new InvalidOperationException(GetResourceString("Arg_NullReferenceException"));
-            return default;
+            Type destType = typeof(T);
+            if (obj == null)
+            {
+                if (destType.IsValueType)
+                    throw e ?? new InvalidOperationException(GetResourceString("Arg_NullReferenceException"));
+                return default(T);
+            }
+
+            if (obj is T t)
+                return t;
+
+            throw e ?? new InvalidOperationException(GetResourceString("InvalidCast_FromTo", obj?.GetType().Name ?? "null", typeof(T).Name));
         }
 
-        if (obj is T t)
-            return t;
-
-        throw e ?? new InvalidOperationException(GetResourceString("InvalidCast_FromTo", obj?.GetType().Name ?? "null", typeof(T).Name));
     }
 }

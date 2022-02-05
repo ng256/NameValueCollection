@@ -1,7 +1,5 @@
-using System;
-using System.Collections;
 using System.Linq;
-using System.Collections.Generic;
+using System.Collections.Specialized;
 using System.Diagnostics;
 using System.Globalization;
 using System.Reflection;
@@ -9,7 +7,7 @@ using System.Resources;
 using System.Runtime.Serialization;
 using static System.Extensions;
 
-namespace System.Collections.Specialized
+namespace System.Collections.Generic
 {
 
     /// <summary>
@@ -103,9 +101,12 @@ namespace System.Collections.Specialized
         }
 
         /// <summary>
-        /// Copies the entries from the specified <see cref="NameValueCollection{T}" /> to a new <see cref="NameValueCollection{T}" />
-        /// with the specified initial capacity or the same initial capacity as the number of entries copied, whichever is greater,
-        /// and using the default case-insensitive hash code provider and the default case-insensitive comparer.
+        /// Copies the entries from the specified <see cref="NameValueCollection{T}" />
+        /// to a new <see cref="NameValueCollection{T}" />
+        /// with the specified initial capacity or the same initial capacity
+        /// as the number of entries copied, whichever is greater,
+        /// and using the default case-insensitive hash code provider
+        /// and the default case-insensitive comparer.
         /// </summary>
         /// <param name="capacity">
         /// The initial number of entries that the <see cref="NameValueCollection{T}" /> can contain.
@@ -123,7 +124,8 @@ namespace System.Collections.Specialized
             : base(capacity)
         {
             if (col == null)
-                throw new ArgumentNullException(nameof(col));
+                throw new ArgumentNullException(nameof(col), 
+                    GetResourceString("ArgumentNull_Collection"));
             Add(col);
         }
 
@@ -184,16 +186,16 @@ namespace System.Collections.Specialized
         /// <returns>
         /// An array that contains all the values in the <see cref="NameValueCollection{T}"/>.
         /// </returns>
-        protected ArrayList GetAllValues()
+        protected T[] GetAllValues()
         {
             int count = Count;
-            ArrayList arrayList = new ArrayList(count);
+            List<T> list = new List<T>(count);
             for (int i = 0; i < count; ++i)
             {
-                arrayList.AddRange(Get(i));
+                list.AddRange(Get(i));
             }
-            arrayList.AsArray<T>();
-            return arrayList;
+
+            return list.ToArray();
         }
 
         /// <summary>
@@ -206,13 +208,10 @@ namespace System.Collections.Specialized
         /// </returns>
         protected IEnumerable<KeyValuePair<string, T>> GetAllEntries()
         {
-            foreach (string key in Keys)
-            {
-                foreach (T value in Get(key))
-                {
-                    yield return new KeyValuePair<string, T>(key, value);
-                }
-            }
+            return 
+                from key in Keys
+                from value in Get(key)
+                select new KeyValuePair<string, T>(key, value);
         }
 
         /// <summary>Adds an entry with the specified name and value to the <see cref="NameValueCollection{T}" />.</summary>
@@ -224,19 +223,16 @@ namespace System.Collections.Specialized
             if (IsReadOnly)
                 throw new NotSupportedException(GetResourceString("CollectionReadOnly"));
             InvalidateCachedArrays();
-            ArrayList arrayList = (ArrayList)BaseGet(name);
-            if (arrayList == null)
+            List<T> list = BaseGet(name) as List<T>;
+            if (list == null)
             {
-                arrayList = new ArrayList(1);
-                if (value != null)
-                    arrayList.Add(value);
-                BaseAdd(name, arrayList);
+                list = new List<T>(1) {value};
+                BaseAdd(name, list);
             }
             else
             {
-                if (value == null)
-                    return;
-                arrayList.Add(value);
+                if (value == null) return;
+                list.Add(value);
             }
         }
 
@@ -254,10 +250,11 @@ namespace System.Collections.Specialized
         /// <exception cref="T:System.ArgumentNullException">
         /// <paramref name="collection" /> is <see langword="null" />.
         /// </exception>
-        public virtual void Add(NameValueCollection<T> collection)
+        public void Add(NameValueCollection<T> collection)
         {
             if (collection == null)
-                throw new ArgumentNullException(nameof(collection));
+                throw new ArgumentNullException(nameof(collection), 
+                    GetResourceString("ArgumentNull_Collection"));
             InvalidateCachedArrays();
             int count = collection.Count;
             for (int i = 0; i < count; i++)
@@ -289,7 +286,8 @@ namespace System.Collections.Specialized
         /// </returns>
         public virtual T[] Get(string name)
         {
-            return ((ArrayList)BaseGet(name)).AsArray<T>();
+            List<T> list = BaseGet(name) as List<T>;
+            return list?.ToArray();
         }
 
         /// <summary>
@@ -307,7 +305,8 @@ namespace System.Collections.Specialized
         /// </exception>
         public virtual T[] Get(int index)
         {
-            return ((ArrayList)BaseGet(index)).AsArray<T>();
+            List<T> list = BaseGet(index) as List<T>;
+            return list?.ToArray();
         }
 
         /// <summary>Sets the value of an entry in the <see cref="NameValueCollection{T}" />.
@@ -328,7 +327,7 @@ namespace System.Collections.Specialized
             if (IsReadOnly)
                 throw new NotSupportedException(GetResourceString("CollectionReadOnly"));
             InvalidateCachedArrays();
-            BaseSet(name, new ArrayList(1) {value});
+            BaseSet(name, new List<T>(1) {value});
         }
 
         /// <summary>Sets the value of an entry in the <see cref="NameValueCollection{T}" />.
@@ -349,7 +348,7 @@ namespace System.Collections.Specialized
             if (IsReadOnly)
                 throw new NotSupportedException(GetResourceString("CollectionReadOnly"));
             InvalidateCachedArrays();
-            BaseSet(name, new ArrayList(values));
+            BaseSet(name, new List<T>(values));
         }
 
         /// <summary>
@@ -401,13 +400,10 @@ namespace System.Collections.Specialized
                 throw new ArgumentException(
                     GetResourceString("Arg_MultiRank"));
             if (index < 0)
-                throw new ArgumentOutOfRangeException(nameof(index), 
-                    GetResourceString("IndexOutOfRange", 
-                        (object)index.ToString(CultureInfo.CurrentCulture)));
-            if (_values == null)
-            {
-                _values = GetAllValues().AsArray<T>();
-            }
+                throw new ArgumentOutOfRangeException(nameof(index),
+                    GetResourceString("IndexOutOfRange",
+                        (object) index.ToString(CultureInfo.CurrentCulture)));
+            if (_values == null) _values = GetAllValues();
             int count = _values.Length;
             if (dest.Length - index < count)
                 throw new ArgumentException(
@@ -491,7 +487,7 @@ namespace System.Collections.Specialized
             get
             {
                 if (_values == null)
-                    _values = GetAllValues().AsArray<T>();
+                    _values = GetAllValues();
                 return _values;
             }
         }
@@ -510,14 +506,8 @@ namespace System.Collections.Specialized
         /// </exception>
         public T[] this[int index]
         {
-            get
-            {
-                return Get(index);
-            }
-            set
-            {
-                BaseSet(index, new ArrayList(value));
-            }
+            get { return Get(index); }
+            set { BaseSet(index, new List<T>(value)); }
         }
 
         /// <summary>
@@ -534,14 +524,8 @@ namespace System.Collections.Specialized
         /// </exception>
         public T[] this[string name]
         {
-            get
-            {
-                return Get(name);
-            }
-            set
-            {
-                BaseSet(name, new ArrayList(value));
-            }
+            get { return Get(name); }
+            set { BaseSet(name, new List<T>(value)); }
         }
 
         #endregion
@@ -569,12 +553,8 @@ namespace System.Collections.Specialized
         /// <inheritdoc cref="IDictionary.Add"/>
         void IDictionary.Add(object key, object value)
         {
-            
-            string k = key.CastTo<string>(new ArgumentException(
-                GetResourceString("Argument_InvalidKey"), nameof(key)));
-            T v = value.CastTo<T>(new ArgumentException(
-                GetResourceString("Argument_InvalidValue"), nameof(key)));
-            ((NameValueCollection<T>)this).Add(k, v);
+            ((NameValueCollection<T>) this).Add(key.CastTo<string>(nameof(key)), 
+                value.CastTo<T>(nameof(value)));
         }
 
         /// <inheritdoc cref="IEnumerable{T}.GetEnumerator"/>
@@ -598,9 +578,7 @@ namespace System.Collections.Specialized
         /// <inheritdoc cref="IDictionary.Remove"/>
         void IDictionary.Remove(object key)
         {
-            string k = key.CastTo<string>(new ArgumentException(
-                GetResourceString("Argument_InvalidKey"), nameof(key)));
-            Remove(k);
+            Remove(key.CastTo<string>(nameof(key)));
         }
 
         /// <inheritdoc cref="IDictionary.this"/>
@@ -608,23 +586,18 @@ namespace System.Collections.Specialized
         {
             get
             {
-                string k = key.CastTo<string>(new ArgumentException(
-                    GetResourceString("Argument_InvalidKey"), nameof(key)));
-                return Get(k);
+                return Get(key.CastTo<string>(nameof(key)));
             }
             set
             {
-                string k = key.CastTo<string>(new ArgumentException(
-                    GetResourceString("Argument_InvalidKey"), nameof(key)));
+                string k = key.CastTo<string>(nameof(key));
                 if (value is IEnumerable<T> collection)
                 {
-                    ((NameValueCollection<T>)this).Set(k, collection.AsArray());
+                    ((NameValueCollection<T>) this).Set(k, collection.ToArray());
                 }
                 else
                 {
-                    T v = value.CastTo<T>(new ArgumentException(
-                        GetResourceString("Argument_InvalidValue"), nameof(key)));
-                    ((NameValueCollection<T>)this).Set(k, v);
+                    ((NameValueCollection<T>) this).Set(k, value.CastTo<T>(nameof(value)));
                 }
             }
         }
@@ -635,27 +608,34 @@ namespace System.Collections.Specialized
 
         private class Enumerator : IEnumerator<KeyValuePair<string, T>>, IDictionaryEnumerator
         {
+            // A special property for viewing entries in the debugger.
             [DebuggerBrowsable(DebuggerBrowsableState.RootHidden)]
             private IEnumerable<KeyValuePair<string, T>> Entries { get; }
 
+            // Enumerate all entries in collection.
             [DebuggerBrowsable(DebuggerBrowsableState.Never)]
             private readonly IEnumerator<KeyValuePair<string, T>> _enumerator;
 
+            // Initialize the enumerator.
             public Enumerator(NameValueCollection<T> collection)
             {
-                IEnumerable<KeyValuePair<string, T>> entries = collection.GetAllEntries().AsArray();
+                IEnumerable<KeyValuePair<string, T>> entries = 
+                    collection.GetAllEntries().ToArray();
                 Entries = entries;
                 _enumerator = entries.GetEnumerator();
             }
+
+
+            // Returns the element of the collection corresponding
+            // to the current position of the enumerator. 
             [DebuggerBrowsable(DebuggerBrowsableState.Never)]
             KeyValuePair<string, T> IEnumerator<KeyValuePair<string, T>>.Current
             {
-                get
-                {
-                    return _enumerator.Current;
-                }
+                get { return _enumerator.Current; }
             }
 
+            // Returns the object of the collection corresponding
+            // to the current position of the enumerator. 
             [DebuggerBrowsable(DebuggerBrowsableState.Never)]
             object IEnumerator.Current
             {
@@ -666,47 +646,56 @@ namespace System.Collections.Specialized
                 }
             }
 
+            // Gets the key of the current dictionary entry.
             [DebuggerBrowsable(DebuggerBrowsableState.Never)]
             object IDictionaryEnumerator.Key
             {
                 get
                 {
-                    IEnumerator<KeyValuePair<string, T>> enumerator = ((IEnumerator<KeyValuePair<string, T>>) this);
+                    IEnumerator<KeyValuePair<string, T>> enumerator = 
+                        ((IEnumerator<KeyValuePair<string, T>>) this);
                     return enumerator.Current.Key;
                 }
             }
 
+            // Gets the value of the current dictionary entry.
             [DebuggerBrowsable(DebuggerBrowsableState.Never)]
             object IDictionaryEnumerator.Value
             {
                 get
                 {
-                    IEnumerator<KeyValuePair<string, T>> enumerator = ((IEnumerator<KeyValuePair<string, T>>) this);
+                    IEnumerator<KeyValuePair<string, T>> enumerator = 
+                        ((IEnumerator<KeyValuePair<string, T>>) this);
                     return enumerator.Current.Value;
                 }
             }
 
+            // Gets both the key and the value of the current dictionary entry.
             [DebuggerBrowsable(DebuggerBrowsableState.Never)]
             DictionaryEntry IDictionaryEnumerator.Entry
             {
                 get
                 {
-                    IEnumerator<KeyValuePair<string, T>> enumerator = ((IEnumerator<KeyValuePair<string, T>>) this);
+                    IEnumerator<KeyValuePair<string, T>> enumerator = 
+                        ((IEnumerator<KeyValuePair<string, T>>) this);
                     return new DictionaryEntry(enumerator.Current.Key,
                         enumerator.Current.Value);
                 }
             }
 
+            // Move enumerator to the next entry.
             public bool MoveNext()
             {
                 return _enumerator.MoveNext();
             }
 
+            // Reset enumerator to start position.
             public void Reset()
             {
                 _enumerator.Reset();
             }
 
+            // Unused dispose pattern.
             public void Dispose()
             {
             }
@@ -716,13 +705,18 @@ namespace System.Collections.Specialized
     }
 }
 
+#region Extensions
+
 namespace System
 {
+    // Internal tools.
     internal static class Extensions
     {
+        // Mscorlib resources.
         private static ResourceSet _mscorlib = null;
 
-        internal static string GetResourceString(string name) // gets mscorlib internal error message.
+        // Gets mscorlib internal error message.
+        internal static string GetResourceString(string name)
         {
             if (_mscorlib == null)
             {
@@ -735,67 +729,21 @@ namespace System
             return _mscorlib.GetString(name);
         }
 
+        // Gets parametrized mscorlib internal error message.
         internal static string GetResourceString(string name, params object[] args)
         {
             return string.Format(GetResourceString(name) ?? throw new ArgumentNullException(nameof(name)), args);
         }
 
-        internal static T[] AsArray<T>(this ArrayList list)
+        // Converts an object to the specified type.
+        internal static T CastTo<T>(this object source, string name)
         {
-            int count = 0;
-            if (list == null || (count = list.Count) == 0)
-                return (T[])null;
-            T[] array = new T[count];
-            list.CopyTo(0, array, 0, count);
-            return array;
+            if (source == null && default(T) != null)
+                throw new ArgumentNullException(name, GetResourceString("Arg_NullReferenceException"));
+            if (source is T dest) return dest;
+            throw new ArgumentException(GetResourceString("Arg_WrongType", source, typeof(T)), name);
         }
-
-        internal static T[] AsArray<T>(this IEnumerable<T> collection)
-        {
-            T[] array = null;
-            int length = 0;
-            if (collection is ICollection<T> elements)
-            {
-                length = elements.Count;
-                if (length > 0)
-                {
-                    array = new T[length];
-                    elements.CopyTo(array, 0);
-                }
-            }
-            else
-            {
-                foreach (T element in collection)
-                {
-                    if (array == null)
-                        array = new T[4];
-                    else if (array.Length == length)
-                    {
-                        T[] tmpArray = new T[checked(length * 2)];
-                        Array.Copy((Array)array, 0, (Array)tmpArray, 0, length);
-                        array = tmpArray;
-                    }
-                    array[length] = element;
-                    ++length;
-                }
-            }
-            return array;
-        }
-        internal static T CastTo<T>(this object obj, Exception e = null)
-        {
-            Type destType = typeof(T);
-            if (obj == null)
-            {
-                if (destType.IsValueType)
-                    throw e ?? new InvalidOperationException(GetResourceString("Arg_NullReferenceException"));
-                return default(T);
-            }
-
-            if (obj is T t)
-                return t;
-
-            throw e ?? new InvalidOperationException(GetResourceString("InvalidCast_FromTo", obj?.GetType().Name ?? "null", typeof(T).Name));
-        }
-
     }
 }
+
+#endregion

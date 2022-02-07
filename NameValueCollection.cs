@@ -735,13 +735,20 @@ namespace System
             return string.Format(GetResourceString(name) ?? throw new ArgumentNullException(nameof(name)), args);
         }
 
-        // Converts an object to the specified type.
+        // Casts an object to the specified type.
         internal static T CastTo<T>(this object source, string name)
         {
-            if (source == null && default(T) != null)
-                throw new ArgumentNullException(name, GetResourceString("Arg_NullReferenceException"));
-            if (source is T dest) return dest;
-            throw new ArgumentException(GetResourceString("Arg_WrongType", source, typeof(T)), name);
+            switch (source)
+            {
+                case null:
+                    return default(T) == null // Check if the type T is nullable.
+                        ? default(T)
+                        : throw new ArgumentNullException(name, GetResourceString("Arg_NullReferenceException"));
+                case T dest:
+                    return dest;
+                default:
+                    throw new ArgumentException(GetResourceString("Arg_WrongType", source, typeof(T)), name);
+            }
         }
     }
 }
